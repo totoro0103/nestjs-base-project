@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
+    AuthModule,
     UsersModule,
     TypeOrmModule.forRoot({
       type: 'mysql',
@@ -20,7 +21,6 @@ import { AuthModule } from './auth/auth.module';
       subscribers: ['dist/**/*.subscriber{.ts,.js}'],
       synchronize: true,
     }),
-    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

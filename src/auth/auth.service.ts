@@ -1,8 +1,8 @@
 import { Injectable, NotAcceptableException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { User } from 'src/users/entities/user.entity';
 import { UsersService } from 'src/users/users.service';
 import * as bcrypt from 'bcrypt';
+import { jwtConstants } from './constants';
 
 @Injectable()
 export class AuthService {
@@ -11,7 +11,33 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async validateUser(email: string, password: string): Promise<User> {
+  async getTokens(data: { name: string; id: number; email: string }) {
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(data, {
+        secret: jwtConstants.jwt_access_secret,
+        expiresIn: '15m',
+      }),
+      this.jwtService.signAsync(data, {
+        secret: jwtConstants.jwt_refresh_secret,
+        expiresIn: '7d',
+      }),
+    ]);
+    return {
+      accessToken,
+      refreshToken,
+    };
+  }
+  async hashData(data: string) {
+    const saltOrRounds = 10;
+    return bcrypt.hash(data, saltOrRounds);
+  }
+
+  async updateRefreshToken(userId: number, rfToken: string) {
+    const hashedRfToken = await this.hashData(rfToken);
+    await this.usersService.update(userId, { refresh_token: hashedRfToken });
+  }
+
+  async validateUser(email: string, password: string): Promise<any> {
     const user = await this.usersService.findOne({ email });
     if (!user) {
       throw new NotAcceptableException('User not found.');

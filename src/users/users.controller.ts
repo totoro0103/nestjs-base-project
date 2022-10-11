@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -15,9 +16,9 @@ import { User } from './entities/user.entity';
 import * as bcrypt from 'bcrypt';
 import { instanceToPlain } from 'class-transformer';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
-
-@Controller('users')
+import { UserNotFoundException } from './exception/userNotFound.exception';
 @UseGuards(JwtAuthGuard)
+@Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -37,6 +38,16 @@ export class UsersController {
   @Get()
   async findAll() {
     return instanceToPlain(await this.usersService.findAll());
+  }
+
+  @Get('/me')
+  async getMe(@Request() req) {
+    const userId = req.user.id;
+    const user = await this.usersService.findOneById(userId);
+    if (!user) {
+      throw new UserNotFoundException(userId);
+    }
+    return instanceToPlain(user);
   }
 
   @Patch(':id')

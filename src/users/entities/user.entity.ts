@@ -24,18 +24,22 @@ export class User {
   @Exclude()
   password: string;
 
+  @Exclude()
+  @Column({ default: null })
+  refresh_token: string;
+
   @CreateDateColumn({
     type: 'timestamp',
     default: () => 'CURRENT_TIMESTAMP(6)',
   })
-  createAt: Date;
+  create_at: Date;
 
   @UpdateDateColumn({
     type: 'timestamp',
     default: () => 'CURRENT_TIMESTAMP(6)',
     onUpdate: 'CURRENT_TIMESTAMP(6)',
   })
-  updateAt: Date;
+  update_at: Date;
 
   @BeforeInsert()
   emailToLowerCase() {

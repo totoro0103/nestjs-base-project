@@ -1,8 +1,10 @@
-import { Injectable, NotAcceptableException } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from 'src/users/users.service';
 import * as bcrypt from 'bcrypt';
 import { jwtConstants } from './constants';
+import { UserNotFoundException } from 'src/users/exception/userNotFound.exception';
+import { instanceToPlain } from 'class-transformer';
 
 @Injectable()
 export class AuthService {
@@ -12,10 +14,10 @@ export class AuthService {
   ) {}
 
   async getTokens(data: { name: string; id: number; email: string }) {
-    const [accessToken, refreshToken] = await Promise.all([
+    const [access_token, refresh_token] = await Promise.all([
       this.jwtService.signAsync(data, {
         secret: jwtConstants.jwt_access_secret,
-        expiresIn: '15m',
+        expiresIn: '1d',
       }),
       this.jwtService.signAsync(data, {
         secret: jwtConstants.jwt_refresh_secret,
@@ -23,8 +25,8 @@ export class AuthService {
       }),
     ]);
     return {
-      accessToken,
-      refreshToken,
+      access_token,
+      refresh_token,
     };
   }
   async hashData(data: string) {
@@ -37,24 +39,45 @@ export class AuthService {
     await this.usersService.update(userId, { refresh_token: hashedRfToken });
   }
 
-  async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.usersService.findOne({ email });
-    if (!user) {
-      throw new NotAcceptableException('User not found.');
-    }
-
-    const passwordValid = await bcrypt.compare(password, user.password);
-    if (user && passwordValid) {
-      return user;
-    }
-
-    return null;
+  async clearRfTokenDB(userId: number) {
+    return this.usersService.update(userId, { refresh_token: null });
   }
 
-  async login(user: any): Promise<any> {
-    const payload = { name: user.name, id: user.id, email: user.email };
-    return {
-      access_token: this.jwtService.sign(payload),
-    };
+  async getUserIfRefreshTokenMatches(userId: number, refreshToken: string) {
+    const user = await this.usersService.findOneById(userId);
+    if (!user || !user.refresh_token)
+      throw new ForbiddenException('Access denied.');
+
+    const refreshTokenValid = await bcrypt.compare(
+      refreshToken,
+      user.refresh_token,
+    );
+
+    if (!refreshTokenValid) throw new ForbiddenException('Access denied.');
+
+    return user;
+  }
+
+  async verifyUserWidthId(userId: number) {
+    const user = await this.usersService.findOneById(userId);
+    if (!user) {
+      throw new UserNotFoundException(userId);
+    }
+    return instanceToPlain(user);
+  }
+
+  public getCookieForLogOut() {
+    return [
+      'Authentication=; HttpOnly; Path=/; Max-Age=0',
+      'Refresh=; HttpOnly; Path=/; Max-Age=0',
+    ];
+  }
+
+  public getCookieWithJwtToken(token: string) {
+    return `Authentication=${token}; HttpOnly; Path=/; Max-Age=6480`;
+  }
+
+  public getCookieWithRfJwtToken(token: string) {
+    return `Refresh=${token}; HttpOnly; Path=/; Max-Age=6480`;
   }
 }

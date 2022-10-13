@@ -15,9 +15,9 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import * as bcrypt from 'bcrypt';
 import { instanceToPlain } from 'class-transformer';
-import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
-import { UserNotFoundException } from './exception/userNotFound.exception';
-@UseGuards(JwtAuthGuard)
+import { AccessTokenGuard } from 'src/auth/guard/accessToken.guard';
+import { RequestWithUser } from 'src/auth/types';
+@UseGuards(AccessTokenGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -40,14 +40,10 @@ export class UsersController {
     return instanceToPlain(await this.usersService.findAll());
   }
 
-  @Get('/me')
-  async getMe(@Request() req) {
-    const userId = req.user.id;
-    const user = await this.usersService.findOneById(userId);
-    if (!user) {
-      throw new UserNotFoundException(userId);
-    }
-    return instanceToPlain(user);
+  @UseGuards(AccessTokenGuard)
+  @Get('me')
+  async getMe(@Request() req: RequestWithUser) {
+    return req.user;
   }
 
   @Patch(':id')
